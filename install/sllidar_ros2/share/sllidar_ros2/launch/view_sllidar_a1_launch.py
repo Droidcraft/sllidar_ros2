@@ -1,1 +1,0 @@
-/components/sllidar_ros2/launch/view_sllidar_a1_launch.py
