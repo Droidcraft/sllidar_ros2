@@ -32,6 +32,7 @@
  *
  */
 
+
 #include "arch/linux/arch_linux.h"
 
 #include <sched.h>
@@ -42,6 +43,16 @@
 
 namespace rp{ namespace hal{
 
+// Wrapper function to adapt thread_proc_t to the expected pthread_create signature
+void* threadWrapper(void* data) {
+    auto procPair = reinterpret_cast<std::pair<thread_proc_t, void*>*>(data);
+    thread_proc_t originalFunction = procPair->first;
+    void* originalData = procPair->second;
+    unsigned long result = originalFunction(originalData);
+    delete procPair; // Free the memory allocated for the pair
+    return reinterpret_cast<void*>(result);
+}
+
 Thread Thread::create(thread_proc_t proc, void * data)
 {
     Thread newborn(proc, data);
@@ -49,7 +60,10 @@ Thread Thread::create(thread_proc_t proc, void * data)
     // tricky code, we assume pthread_t is not a structure but a word size value
     assert( sizeof(newborn._handle) >= sizeof(pthread_t));
 
-    pthread_create((pthread_t *)&newborn._handle, NULL, (void * (*)(void *))proc, data);
+    // Creating a pair to hold both the function and its data
+    auto procPair = new std::pair<thread_proc_t, void*>(proc, data);
+
+    pthread_create((pthread_t *)&newborn._handle, NULL, threadWrapper, procPair);
 
     return newborn;
 }
